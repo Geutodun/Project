@@ -1,0 +1,60 @@
+#define BtSerial Serial1
+const int forceSensor = A1;
+const int led = 9;
+const int activeB =12;
+char bt2;
+int cnt = 0;
+
+void setup() {
+  BtSerial.begin(9600);
+  pinMode(led,OUTPUT);
+  pinMode(activeB, OUTPUT);
+
+}
+
+void loop() {
+
+  int value = analogRead(forceSensor);
+ 
+  char bt1;
+  if (BtSerial.available()){
+    bt1 = BtSerial.read();
+    int sum = bt1 - '0';
+    if((bt1 != bt2) && (sum != 0))
+    {
+      bt2 = bt1;    
+    }
+   }
+   
+      if(bt2 == 'a')
+      {
+        if(value <= 100){
+          noTone(activeB);
+          digitalWrite(led,LOW);
+          cnt = 0;
+        }
+        else{
+          cnt += 1;
+          delay(1000);
+          if (cnt >= 10){
+            tone(activeB, 262, 1000);
+            digitalWrite(led,HIGH);
+            }
+             
+        }
+   
+      }
+
+      if(bt2 == 'b')
+      {
+        if(value >= 100){
+          noTone(activeB);
+          digitalWrite(led,LOW);
+         
+        }
+        else{
+            tone(activeB, 262, 1000);
+            digitalWrite(led,HIGH);  
+        }
+   
+      }
