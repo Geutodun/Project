@@ -1,0 +1,439 @@
+#include <gl/glut.h>
+#include <gl/gl.h>
+#include <gl/glu.h>
+#include <stdio.h>
+#include <math.h>
+#include <cmath> // fabs 함수 사용
+#include <string>
+
+int score = 0; // 점수 변수
+int sc = 0;
+
+int view = 0;
+int viewx = 0;
+
+int carX = 0; // -1: 왼쪽 차선, 0: 중앙 차선, 1: 오른쪽 차선
+
+
+float coneZ = -40.0f; // 초기 원뿔 Z축 위치
+float coneSpeed = 0.2f; // 원뿔이 자동차 쪽으로 이동하는 속도
+
+float coneZ2 = -80.0f; // 초기 원뿔 Z축 위치
+float coneSpeed2 = 0.2f; // 원뿔이 자동차 쪽으로 이동하는 속도
+
+float coneZ3 = -80.0f; // 초기 원뿔 Z축 위치
+float coneSpeed3 = 0.2f; // 원뿔이 자동차 쪽으로 이동하는 속도
+
+float buildingZOffset = 0.0f; // 건물들의 Z축 위치 오프셋
+float buildingSpeed = 0.2f;   // 건물이 자동차 쪽으로 이동하는 속도
+
+
+void renderText(float x, float y, const std::string& text) {
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0, 800, 0, 600); // 화면 크기와 맞추기 위해 2D 직교 투영 사용
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glColor3f(1.0f, 1.0f, 1.0f); // 흰색 텍스트
+    glRasterPos2f(x, y); // 텍스트 위치 설정
+    for (char c : text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, c); // 텍스트 출력
+    }
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+
+void checkCollision() {
+    // 자동차의 Z 위치
+    float carZ = 7.0f;
+
+    // 자동차의 X 위치
+    float carXPosition = carX * 4.0f;
+
+    // 충돌 감지 범위
+    float thresholdX = 1.5f; // X축 범위
+    float thresholdZ = 1.5f; // Z축 범위
+
+    // 원뿔 1 충돌 감지
+    if (fabs(carXPosition - 0.0f) < thresholdX && fabs(carZ - coneZ) < thresholdZ) {
+        printf("Collision with cone 1! Exiting...\n");
+        exit(0);
+    }
+
+    // 원뿔 2 충돌 감지
+    if (fabs(carXPosition - 4.0f) < thresholdX && fabs(carZ - coneZ2) < thresholdZ) {
+        printf("Collision with cone 2! Exiting...\n");
+        exit(0);
+    }
+
+    // 원뿔 3 충돌 감지
+    if (fabs(carXPosition + 4.0f) < thresholdX && fabs(carZ - coneZ3) < thresholdZ) {
+        printf("Collision with cone 3! Exiting...\n");
+        exit(0);
+    }
+}
+
+
+void MyLightInit() {
+    // 전역 주변광 설정 (화면 전체 밝기)
+    GLfloat global_ambient[] = { 0.6, 0.6, 0.6, 1.0 }; // 전체 조명 강도 증가
+
+    // 광원의 특성
+    GLfloat light1_ambient[] = { 0.4, 0.4, 0.4, 1.0 };  // 주변광
+    GLfloat light1_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };  // 확산광 (밝은 효과)
+    GLfloat light1_specular[] = { 1.0, 1.0, 1.0, 1.0 }; // 반사광 (하이라이트 효과)
+
+    // 재질의 특성
+    GLfloat material_ambient[] = { 0.8, 0.8, 0.8, 1.0 };  // 주변광 반사 증가
+    GLfloat material_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };  // 확산광 반사 증가
+    GLfloat material_specular[] = { 0.8, 0.8, 0.8, 1.0 }; // 반사광 반사 증가
+    GLfloat material_shininess[] = { 50.0 };               // 반짝임 강도
+
+    glShadeModel(GL_SMOOTH);  // 부드러운 셰이딩
+    glEnable(GL_DEPTH_TEST);  // 깊이 버퍼 활성화
+
+    // 조명 활성화
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT1);
+
+    // 광원 설정
+    glLightfv(GL_LIGHT1, GL_AMBIENT, light1_ambient);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, light1_diffuse);
+    glLightfv(GL_LIGHT1, GL_SPECULAR, light1_specular);
+
+    // 전역 주변광 설정
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, global_ambient);
+
+    // 색상 추적 활성화
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE); // glColor3f가 ambient와 diffuse로 동작
+
+    // 재질 설정
+    glMaterialfv(GL_FRONT, GL_AMBIENT, material_ambient);
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, material_diffuse);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, material_specular);
+    glMaterialfv(GL_FRONT, GL_SHININESS, material_shininess);
+}
+
+void update(int value) {
+    coneZ += coneSpeed;
+    if (coneZ > 10.0f) {
+        coneZ = -60.0f;
+    }
+
+    coneZ2 += coneSpeed2;
+    if (coneZ2 > 10.0f) {
+        coneZ2 = -80.0f;
+    }
+
+    coneZ3 += coneSpeed3;
+    if (coneZ3 > 10.0f) {
+        coneZ3 = -60.0f;
+    }
+
+    // 점수 증가
+    if ((sc % 60 == 0))
+        score += 1;
+
+    // 충돌 감지
+    checkCollision();
+
+    // 건물 이동
+    buildingZOffset += buildingSpeed;
+    if (buildingZOffset > 10.0f) {
+        buildingZOffset = 0.0f;
+    }
+
+    sc++;
+
+    glutPostRedisplay(); // 디스플레이 업데이트 요청
+    glutTimerFunc(16, update, 0); // 약 60FPS (16ms 간격)으로 갱신
+}
+
+
+
+// 바퀴 그리기
+void drawWheel(float x, float y, float z, float radius) {
+    glPushMatrix();
+    glTranslatef(x, y, z);
+    glColor3f(0.1f, 0.1f, 0.1f); // 검정색
+    glutSolidTorus(0.1f * radius, radius, 20, 20); // 바퀴: 토러스
+    glPopMatrix();
+}
+
+
+
+// 차체 그리기
+void drawCarBody() {
+    // 메인 차체
+    glColor3f(0.0f, 0.5f, 1.0f); // 파란색
+    glPushMatrix();
+    glScalef(1.5f, 0.5f, 1.0f); // 직육면체 크기
+    glutSolidCube(1.0f);
+    glPopMatrix();
+
+    // 윗부분 (창문 영역)
+    glColor3f(0.0f, 0.8f, 1.0f); // 연파란색
+    glPushMatrix();
+    glTranslatef(0.0f, 0.4f, 0.0f);
+    glScalef(0.9f, 0.4f, 0.8f); // 직육면체 크기
+    glutSolidCube(1.0f);
+    glPopMatrix();
+}
+
+
+
+// 자동차 그리기
+void drawCar() {
+    // 차체
+    drawCarBody();
+
+    // 바퀴
+    drawWheel(-0.8f, -0.25f, 0.5f, 0.3f);  // 왼쪽 앞 바퀴
+    drawWheel(0.8f, -0.25f, 0.5f, 0.3f);   // 오른쪽 앞 바퀴
+    drawWheel(-0.8f, -0.25f, -0.5f, 0.3f); // 왼쪽 뒤 바퀴
+    drawWheel(0.8f, -0.25f, -0.5f, 0.3f);  // 오른쪽 뒤 바퀴
+}
+
+
+
+// 차선 그리기
+void drawLane() {
+
+    glColor3f(1.0f, 1.0f, 1.0f); // 흰색 차선
+    glPushMatrix();
+
+    // 화면 끝까지 확장된 Z축 범위
+    float laneZStart = 200.0f;  // 화면 앞쪽 끝
+    float laneZEnd = -200.0f;   // 화면 뒤쪽 끝
+
+    // 왼쪽 차선 (직사각형)
+    glBegin(GL_QUADS);
+    glVertex3f(-2.1f, -0.5f, laneZEnd);   // 왼쪽 아래
+    glVertex3f(-1.9f, -0.5f, laneZEnd);   // 오른쪽 아래
+    glVertex3f(-1.9f, -0.5f, laneZStart); // 오른쪽 위
+    glVertex3f(-2.1f, -0.5f, laneZStart); // 왼쪽 위
+    glEnd();
+
+    glBegin(GL_QUADS);
+    glVertex3f(-6.1f, -0.5f, laneZEnd);   // 왼쪽 아래
+    glVertex3f(-5.9f, -0.5f, laneZEnd);   // 오른쪽 아래
+    glVertex3f(-5.9f, -0.5f, laneZStart); // 오른쪽 위
+    glVertex3f(-6.1f, -0.5f, laneZStart); // 왼쪽 위
+    glEnd();
+
+    // 오른쪽 차선 (직사각형)
+    glBegin(GL_QUADS);
+    glVertex3f(1.9f, -0.5f, laneZEnd);   // 왼쪽 아래
+    glVertex3f(2.1f, -0.5f, laneZEnd);   // 오른쪽 아래
+    glVertex3f(2.1f, -0.5f, laneZStart); // 오른쪽 위
+    glVertex3f(1.9f, -0.5f, laneZStart); // 왼쪽 위
+    glEnd();
+
+    glBegin(GL_QUADS);
+    glVertex3f(5.9f, -0.5f, laneZEnd);   // 왼쪽 아래
+    glVertex3f(6.1f, -0.5f, laneZEnd);   // 오른쪽 아래
+    glVertex3f(6.1f, -0.5f, laneZStart); // 오른쪽 위
+    glVertex3f(5.9f, -0.5f, laneZStart); // 왼쪽 위
+    glEnd();
+
+    glPopMatrix();
+
+}
+
+
+
+// 원뿔 그리기
+void drawConeObject(float x, float y, float z, float base, float height) {
+    glPushMatrix();
+    glTranslatef(x, y, z);          // 원뿔의 위치 설정
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f); // X축을 기준으로 90도 회전시켜 Z축 기준으로 세움
+    glColor3f(1.0f, 0.5f, 0.0f);   // 주황색
+    glutSolidCone(base, height, 20, 20); // 원뿔 생성
+    glPopMatrix();
+}
+
+
+
+void drawBuilding(float x, float z, float width, float height, float depth) {
+    glPushMatrix();
+    glTranslatef(x, height / 2.0f, z); // 건물의 중심 위치 설정
+    glColor3f(1.0f, 0.5f, 0.5f); // 회색 건물 색상
+    glScalef(width, height, depth); // 건물 크기 설정
+    glutSolidCube(1.0f); // 직육면체 건물
+    glPopMatrix();
+}
+
+
+
+// 디스플레이 콜백
+void display() {
+    GLfloat LightPosition1[] = { 0.0, 50.0, 30.0, 1.0 }; // 위쪽 약간 앞쪽에서 비추도록 조정
+    GLfloat LightDirection1[] = { 0.0, -1.0, 0.0, 1.0 };	//1번 광원 방향
+    GLfloat SpotAngle1[] = { 60.0 };
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    if (view == 0)
+    {
+        gluLookAt(0.0, 13.0, 13.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    }
+    else if (view == 1)
+    {
+        gluLookAt(viewx, 2.0, 7.5, viewx, 0.0, 0.0, 0.0, 1.0, 0.0);
+    }
+
+    glFrontFace(GL_CW);
+    glEnable(GL_CULL_FACE);
+
+    glLightfv(GL_LIGHT1, GL_POSITION, LightPosition1);	//스포트라이트
+
+    glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, LightDirection1);	//방향
+    glLightfv(GL_LIGHT1, GL_SPOT_CUTOFF, SpotAngle1);	//각도
+    glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, 1.0);			//코사인 승수
+
+    glPushMatrix();
+    glColor3f(0.5, 0.5, 0.5);
+    glBegin(GL_POLYGON);       	 	//입력 기본요소 정의	
+    glVertex3f(-6.1, -0.6, -200.0);
+    glVertex3f(6.1, -0.6, -200.0);
+    glVertex3f(6.1, -0.6, 200.0);
+    glVertex3f(-6.1, -0.6, 200.0);
+    glEnd();
+    glPopMatrix();
+
+    glPushMatrix();
+    glColor3f(0.0, 1.0, 0.0);
+    glBegin(GL_POLYGON);       	 	//입력 기본요소 정의	
+    glVertex3f(6.1, -0.6, -200.0);
+    glVertex3f(100., -0.6, -200.0);
+    glVertex3f(100.1, -0.6, 200.0);
+    glVertex3f(6.1, -0.6, 200.0);
+    glEnd();
+    glPopMatrix();
+
+    glPushMatrix();
+    glColor3f(0.0, 1.0, 0.0);
+    glBegin(GL_POLYGON);       	 	//입력 기본요소 정의	
+    glVertex3f(-100.0, -0.6, -200.0);
+    glVertex3f(-6.1, -0.6, -200.0);
+    glVertex3f(-6.1, -0.6, 200.0);
+    glVertex3f(-100.0, -0.6, 200.0);
+    glEnd();
+    glPopMatrix();
+
+    // 건물 배치
+    for (float z = -2000.0f; z < 2000.0f; z += 10.0f) {
+        float adjustedZ = z + buildingZOffset; // 건물 Z축 이동
+        drawBuilding(-8.0f, adjustedZ, 3.0f, 6.0f, 3.0f); // 왼쪽 건물
+        drawBuilding(8.0f, adjustedZ, 3.0f, 6.0f, 3.0f);  // 오른쪽 건물
+    }
+
+    // 원뿔 오브젝트 그리기
+    glPushMatrix();
+    drawConeObject(0.0f, 0.0f, coneZ, 0.5f, 1.5f);
+    drawConeObject(4.0f, 0.0f, coneZ2, 0.5f, 1.5f);
+    drawConeObject(-4.0f, 0.0f, coneZ3, 0.5f, 1.5f);
+    glPopMatrix();
+
+    // 자동차 그리기
+    glPushMatrix();
+    glTranslatef(carX * 4.0f, 0.0f, 7.0f);
+    glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+    drawCar();
+    glPopMatrix();
+
+    // 차선 그리기
+    glPushMatrix();
+    drawLane();
+    glPopMatrix();
+
+    // 점수 표시
+    renderText(650.0f, 550.0f, "Score: " + std::to_string(score));
+
+    glutSwapBuffers();
+}
+
+
+
+void reshape(int width, int height) {
+    if (height == 0) height = 1; // 0으로 나누는 오류 방지
+    float aspect = (float)width / (float)height;
+
+    glViewport(0, 0, width, height); // 윈도우 전체를 뷰포트로 설정
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    // 시야각을 증가시켜 원근감을 더 강조
+    gluPerspective(60.0f, aspect, 1.0f, 200.0f); // 시야각(60도), 종횡비(aspect), 가까운 평면, 먼 평면
+    glMatrixMode(GL_MODELVIEW);
+}
+
+
+
+// 윈도우 초기화
+void init() {
+    glEnable(GL_DEPTH_TEST); // 깊이 테스트 활성화
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 어두운 회색 배경
+}
+
+// 방향키 입력 처리
+void handleSpecialKeypress(int key, int x, int y) {
+    switch (key) {
+    case GLUT_KEY_LEFT:  // 왼쪽 화살표 키
+        if (carX > -1) // 왼쪽 끝을 넘지 않도록 제한
+        {
+            carX -= 1;
+            viewx -= 4;
+        }
+        break;
+    case GLUT_KEY_RIGHT: // 오른쪽 화살표 키
+        if (carX < 1) // 오른쪽 끝을 넘지 않도록 제한
+        {
+            carX += 1;
+            viewx += 4;
+        }
+        break;
+    }
+    glutPostRedisplay(); // 화면 갱신 요청
+}
+
+// 일반 키 입력 처리
+void handleKeypress(unsigned char key, int x, int y) {
+    switch (key) {
+    case 'V':
+    case 'v':
+        if (view == 0)
+            view = 1; // 시점 변경
+        else
+            view = 0;
+        break;
+    }
+    glutPostRedisplay(); // 화면 갱신 요청
+}
+
+
+
+// 메인 함수
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow("3D Car with Lanes in OpenGL");
+
+    //init();
+    MyLightInit();
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutSpecialFunc(handleSpecialKeypress); // 방향키 콜백 등록
+    glutKeyboardFunc(handleKeypress);      // 일반 키 콜백 등록
+    glutTimerFunc(16, update, 0); // 타이머 콜백 초기화
+    glutMainLoop();
+    return 0;
+}
