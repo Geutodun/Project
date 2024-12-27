@@ -1,0 +1,61 @@
+#include <wiringPi.h>
+#include <stdio.h>
+
+// 서보 모터를 제어할 핀 번호
+#define SERVO_PIN 1 //12번핀
+#define SW 29  /40번핀
+
+void moveServo(int angle) {
+    // 각도를 PWM 듀티 사이클로 변환 (0도 = 50, 180도 = 250)
+    int pwmValue = (int)(50 + (angle / 180.0) * 200);
+    pwmWrite(SERVO_PIN, pwmValue);
+}
+
+int main() {
+    // wiringPi 초기화
+    if (wiringPiSetup() == -1) {
+        printf("wiringPi 초기화 실패!\n");
+        return 1;
+    }
+
+    // 서보 핀을 PWM 출력으로 설정
+    pinMode(SERVO_PIN, PWM_OUTPUT);
+    pinMode(SW, INPUT);
+
+    // PWM 주파수 설정 (50Hz)
+    pwmSetMode(PWM_MODE_MS);
+    pwmSetClock(192);
+    pwmSetRange(2000);
+
+	int x = 0;
+	while (1) {
+		if ((digitalRead(SW) == LOW) && (x == 0))
+		{
+			x = 1;
+			delay(1000); //1초대기
+		}
+
+
+		if (x == 1)
+		{
+            printf("서보 모터를 90도로 이동 중...\n");
+            moveServo(90);
+            delay(500); 
+
+            // 서보 모터를 원래 위치(0도)로 복귀
+            printf("서보 모터를 원래 위치로 복귀 중...\n");
+            moveServo(0);
+            delay(500); 
+		}
+
+		if ((digitalRead(SW) == LOW) && (x == 1))
+		{
+			x = 0;
+            delay(1000);
+		}
+
+	}
+ 
+
+    return 0;
+}
