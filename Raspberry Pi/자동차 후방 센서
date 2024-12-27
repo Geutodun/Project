@@ -1,0 +1,136 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/time.h> // 추가
+#include "gpiolib.c"
+
+#define GPIO_TRIGGER 19 //연결한 핀
+#define GPIO_ECHO 26 //연결한 핀
+
+#define LOW 0
+#define HIGH 1
+
+#define R 13
+#define G 6
+#define B 5
+
+long micros() {
+	struct timeval currentTime;
+	gettimeofday(&currentTime, NULL);
+	return currentTime.tv_sec * (int)1e6 + currentTime.tv_usec;
+}
+
+int HR(void) {
+	long start, stop;
+	float distance;
+
+	printf("Raspberry Pi HC-SR04 Ultrasonic sensor test program\n");
+
+	gpioExport(GPIO_TRIGGER);
+	gpioExport(GPIO_ECHO);
+	gpioDirection(GPIO_TRIGGER, 1); // 1로 설정하여 출력으로 설정
+	gpioDirection(GPIO_ECHO, 0);    // 0으로 설정하여 입력으로 설정
+
+
+	// Send 10us pulse to trigger
+	gpioWrite(GPIO_TRIGGER, HIGH);
+	usleep(10);
+	gpioWrite(GPIO_TRIGGER, LOW);
+
+	// Wait for echo signal
+	while (gpioRead(GPIO_ECHO) == LOW);
+	start = micros();
+
+	while (gpioRead(GPIO_ECHO) == HIGH);
+	stop = micros();
+
+	distance = (float)(stop - start) / 58.8235;
+	printf("Distance : %9.1f cm\n", distance);
+
+	int x = (int)distance;
+	gpioUnexport(GPIO_TRIGGER);
+	gpioUnexport(GPIO_ECHO);
+	return x;
+}
+
+
+int ledControl(int gpio, int onOff)
+{
+	int fd;
+	char buf[128];
+
+	gpioExport(gpio);
+
+	gpioDirection(gpio, 1); // "out"
+
+	gpioWrite(gpio, onOff);
+
+	gpioUnexport(gpio);
+
+	return 0;
+}
+
+
+int ledSW_Control(int gpio, int onOff)
+{
+	int fd;
+	char buf[128];
+	char inCh;
+
+	gpioExport(gpio);
+
+	gpioDirection(gpio, 0); // "in"
+	int x = 0;
+	while (1) {
+		if ((gpioRead(gpio) == 0) && (x == 0))
+		{
+			x = 1;
+			usleep(1000000);
+		}
+
+		if (x == 1)
+		{
+			int a = HR();
+			if (a < 10)
+			{
+				ledControl(R, 1);
+				ledControl(G, 0);
+				ledControl(B, 0);
+			}
+			else if(a < 20)
+			{
+				ledControl(R, 0);
+				ledControl(G, 1);
+				ledControl(B, 0);
+			}
+			else
+			{
+				ledControl(R, 0);
+				ledControl(G, 0);
+				ledControl(B, 1);
+			}
+			usleep(500000);
+		}
+
+		if ((gpioRead(gpio) == 0) && (x == 1))
+		{
+			x = 0;
+			ledControl(R, 0);
+			ledControl(G, 0);
+			ledControl(B, 0);
+			usleep(1000000);
+		}
+
+	}
+
+	gpioUnexport(gpio);
+
+	return 0;
+}
+
+int main()
+{
+	printf("Start Led SW !!!\n");
+	ledSW_Control(21, 0);
+
+	return 0;
+}
