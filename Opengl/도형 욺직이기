@@ -1,0 +1,92 @@
+/*
+사각형 하나 생성후 0.01초마다 변의 길이를 1픽셀 씩 증가하고 3도씩 회전 x,y방향으로 증가 후 벽에 부딪히면 반대 방향으로
+*/
+
+#include <GL/glut.h>
+#include <GL/GL.h>
+#include <GL/GLU.h>
+
+static double Time = 0.0;
+static int Stop = 0;  //30
+static double x = 0;  //30
+static double y = 0;  //30
+static double x_dir = 0.001; // x 방향 이동 속도
+static double y_dir = 0.001; // y 방향 이동 속도
+static int E = 1;
+
+
+// 디스플레이 콜백 함수
+void MyDisplay() {
+    glClear(GL_COLOR_BUFFER_BIT); // 화면 초기화
+    glViewport(0, 0, 640, 480);  //없어도 됨
+
+    glMatrixMode(GL_MODELVIEW);  //모델 뷰 스택
+    glLoadIdentity();  //초기화
+
+    glPushMatrix();
+    glTranslatef(x, y, 0.0);  /////////////////	이동
+    glRotatef(Stop, 0.0/*x*/, 0.0/*y*/, 1.0/*z*/);
+    
+    glColor3f(0, 0, 1);
+    glBegin(GL_POLYGON);
+        glVertex3f(0.1 + Time, -0.1 - Time, 0.0);
+        glVertex3f(0.1 + Time, 0.1 + Time, 0.0);
+        glVertex3f(-0.1 - Time, 0.1 + Time, 0.0);
+        glVertex3f(-0.1 - Time, -0.1 - Time, 0.0);
+    glEnd();
+    glPopMatrix();
+
+    glutSwapBuffers();
+    glFlush();  //꼭 하기
+}
+
+
+// 타이머 콜백 함수
+void MyTimer(int Value/*타이머 번호를 받아서 어떤 타이머인지 확인*/) {
+    
+    Time += 0.0001;
+    Stop = (Stop + 3) % 360;
+
+    // 화면 경계를 확인하고 이동 방향을 반대로 설정
+    if (x + 0.1 + Time >= 0.95 && E == 1) {
+        x_dir = -x_dir; // x 방향 반전
+        y_dir = -y_dir;
+        E = 0;
+    }
+    if (x - 0.1 - Time <= -0.99 && E == 0) {
+        x_dir = -x_dir; // x 방향 반전
+        y_dir = -y_dir;
+        E = 1;
+    }
+
+    // x, y의 이동 방향에 따라 위치 변경
+    x += x_dir;
+    y += y_dir;
+
+    glutPostRedisplay(); //화면재설정
+    glutTimerFunc(1, MyTimer, Value);
+}
+
+
+int main(int argc, char** argv) {
+    // 윈도우 초기화
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+    glutInitWindowSize(700, 700); // 창 크기
+    glutInitWindowPosition(0, 0); // 창 위치
+    glutCreateWindow("Opengl");
+    glClearColor(1.0, 1.0, 1.0, 1.0); // 배경 색상 (흰색)
+
+    // 무대 설정
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0); // 무대 크기 설정
+
+
+    // 콜백 함수 등록
+    glutDisplayFunc(MyDisplay);
+    glutTimerFunc(1, MyTimer, 1);
+
+    glutMainLoop(); // 무한 루프
+    return 0;
+}
